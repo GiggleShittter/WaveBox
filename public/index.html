@@ -766,7 +766,7 @@ function showToast(msg, isErr = false) {
     t.textContent = msg;
     t.style.background = isErr ? '#ff4d4d' : 'var(--purple)';
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+    setTimeout(() => t.classList.remove('show'), 5000);
 }
 
 function toggleTheme() {
