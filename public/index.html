@@ -6,7 +6,40 @@
 <title>WaveBox</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--surface3:#22222f;--purple:#9b5de5;--purple-bright:#b97aff;--purple-dim:#6b3fa8;--purple-glow:rgba(155,93,229,0.15);--purple-glow2:rgba(155,93,229,0.06);--text:#f0eeff;--text-muted:#8888aa;--text-dim:#4a4a66;--border:rgba(155,93,229,0.12);--sidebar-w:240px;--player-h:88px;}
+:root{
+  --bg:#0a0a0f;
+  --surface:#111118;
+  --surface2:#1a1a24;
+  --surface3:#22222f;
+  --purple:#9b5de5;
+  --purple-bright:#b97aff;
+  --purple-dim:#6b3fa8;
+  --purple-glow:rgba(155,93,229,0.15);
+  --purple-glow2:rgba(155,93,229,0.06);
+  --text:#f0eeff;
+  --text-muted:#8888aa;
+  --text-dim:#4a4a66;
+  --border:rgba(155,93,229,0.12);
+  --sidebar-w:240px;
+  --player-h:88px;
+}
+
+/* Light Mode */
+[data-theme="light"] {
+  --bg:#f8f7ff;
+  --surface:#ffffff;
+  --surface2:#f0efff;
+  --surface3:#e8e4ff;
+  --purple:#9b5de5;
+  --purple-bright:#b97aff;
+  --purple-dim:#6b3fa8;
+  --purple-glow:rgba(155,93,229,0.18);
+  --purple-glow2:rgba(155,93,229,0.10);
+  --text:#2a263f;
+  --text-muted:#6b5f8a;
+  --text-dim:#8f7eb3;
+  --border:rgba(155,93,229,0.25);
+}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:grid;grid-template-columns:var(--sidebar-w) 1fr;grid-template-rows:1fr var(--player-h);overflow:hidden;user-select:none;}
 
@@ -220,6 +253,49 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 
 .scroll-pad{height:24px;}
 @media(max-width:600px){:root{--sidebar-w:0px;}#sidebar{display:none;}body{grid-template-columns:1fr;}}
+
+/* ==================== THEME TOGGLE ==================== */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 50px;
+  padding: 4px;
+  cursor: pointer;
+  width: 58px;
+  height: 32px;
+  position: relative;
+  transition: all 0.3s ease;
+  margin-left: 12px;
+}
+
+.theme-toggle .slider {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+[data-theme="light"] .theme-toggle .slider {
+  transform: translateX(26px);
+}
+
+.theme-toggle .sun { color: #f4b400; }
+.theme-toggle .moon { color: #9b5de5; }
+
+[data-theme="light"] .theme-toggle {
+  background: var(--surface);
+}
 </style>
 </head>
 <body>
@@ -263,11 +339,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
   <button class="new-playlist-btn" onclick="openNewPlaylist()">➕ New Playlist</button>
 </aside>
 
-<main id="main">
-  <!-- HOME -->
-  <div class="view active" id="view-home">
-    <div class="main-header">
+<div class="main-header">
       <div class="search-bar"><span>🔍</span><input type="text" placeholder="Search your music..." id="search-input" oninput="handleSearch(this.value)"></div>
+      
+      <!-- Theme Toggle Slider (Dark/Light) -->
+      <div class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+        <div class="slider" id="theme-slider"><span class="moon">🌙</span></div>
+      </div>
+
       <button class="upload-btn" id="upload-btn" onclick="document.getElementById('file-input').click()" style="display:none">⬆ Upload</button>
       <input type="file" id="file-input" multiple accept="audio/*" onchange="handleFileUpload(this.files)">
       <input type="file" id="artist-img-input" accept="image/*" onchange="handleArtistImageUpload(this.files)">
@@ -444,6 +523,25 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
 <div class="toast" id="toast"></div>
 
 <script>
+// ==================== THEME TOGGLE ====================
+let currentTheme = localStorage.getItem('wavebox-theme') || 'dark';
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  currentTheme = theme;
+  localStorage.setItem('wavebox-theme', theme);
+  const slider = document.getElementById('theme-slider');
+  slider.innerHTML = theme === 'light' ? '<span class="sun">☀️</span>' : '<span class="moon">🌙</span>';
+}
+
+function toggleTheme() {
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  applyTheme(newTheme);
+}
+
+applyTheme(currentTheme);
+// ==================== END THEME TOGGLE ====================
+  
 let isAdmin=false,adminPassword='';
 let tracks=[],playlists=JSON.parse(localStorage.getItem('wb_playlists')||'[]');
 let liked=JSON.parse(localStorage.getItem('wb_liked')||'[]');
