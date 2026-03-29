@@ -2,177 +2,106 @@ require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
-const { google } = require('googleapis');
 const path = require('path');
-const fs = require('fs');
-const { Readable } = require('stream');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
-const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
+const BUCKET = 'WaveBox-music';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SECRET_KEY
+);
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── GOOGLE AUTH ──
-function getAuth() {
-  return new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    },
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-}
-
-function getDrive() {
-  return google.drive({ version: 'v3', auth: getAuth() });
-}
-
-// ── MULTER (memory storage) ──
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB per file
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('audio/')) cb(null, true);
     else cb(new Error('Audio files only'));
   }
 });
 
-// ── AUTH CHECK ──
+// ── AUTH ──
 app.post('/api/auth', (req, res) => {
   const { password } = req.body;
-  if (password === ADMIN_PASSWORD) {
-    res.json({ ok: true });
-  } else {
-    res.status(401).json({ ok: false, error: 'Wrong password' });
-  }
+  res.json({ ok: password === ADMIN_PASSWORD });
 });
 
 // ── GET TRACKS ──
 app.get('/api/tracks', async (req, res) => {
   try {
-    const drive = getDrive();
-    const response = await drive.files.list({
-      q: `'${FOLDER_ID}' in parents and mimeType contains 'audio/' and trashed = false`,
-      fields: 'files(id, name, size, createdTime, mimeType)',
-      orderBy: 'createdTime desc',
-      pageSize: 1000,
+    const { data, error } = await supabase.storage.from(BUCKET).list('', {
+      limit: 1000,
+      sortBy: { column: 'created_at', order: 'desc' }
     });
 
-    const files = response.data.files.map(f => {
-      const rawName = f.name.replace(/\.[^/.]+$/, '');
-      let title = rawName, artist = 'Unknown Artist';
-      if (rawName.includes(' - ')) {
-        const parts = rawName.split(' - ');
-        artist = parts[0].trim();
-        title = parts.slice(1).join(' - ').trim();
-      }
-      return {
-        id: f.id,
-        title,
-        artist,
-        name: f.name,
-        size: f.size,
-        added: f.createdTime,
-        streamUrl: `/api/stream/${f.id}`,
-      };
-    });
+    if (error) throw error;
 
-    res.json(files);
+    const tracks = data
+      .filter(f => f.name && !f.name.startsWith('.'))
+      .map(f => {
+        const rawName = f.name.replace(/\.[^/.]+$/, '');
+        let title = rawName, artist = 'Unknown Artist';
+        if (rawName.includes(' - ')) {
+          const parts = rawName.split(' - ');
+          artist = parts[0].trim();
+          title = parts.slice(1).join(' - ').trim();
+        }
+        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(f.name);
+        return {
+          id: f.id || f.name,
+          title,
+          artist,
+          name: f.name,
+          added: f.created_at,
+          streamUrl: urlData.publicUrl
+        };
+      });
+
+    res.json(tracks);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to list tracks' });
   }
 });
 
-// ── STREAM TRACK ──
-app.get('/api/stream/:fileId', async (req, res) => {
-  try {
-    const drive = getDrive();
-    const meta = await drive.files.get({ fileId: req.params.fileId, fields: 'mimeType, size, name' });
-    const mimeType = meta.data.mimeType || 'audio/mpeg';
-    const fileSize = parseInt(meta.data.size);
-
-    const range = req.headers.range;
-    if (range) {
-      const parts = range.replace(/bytes=/, '').split('-');
-      const start = parseInt(parts[0]);
-      const end = parts[1] ? parseInt(parts[1]) : fileSize - 1;
-      const chunkSize = end - start + 1;
-
-      res.writeHead(206, {
-        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunkSize,
-        'Content-Type': mimeType,
-      });
-
-      const streamRes = await drive.files.get(
-        { fileId: req.params.fileId, alt: 'media' },
-        { responseType: 'stream', headers: { Range: `bytes=${start}-${end}` } }
-      );
-      streamRes.data.pipe(res);
-    } else {
-      res.writeHead(200, {
-        'Content-Length': fileSize,
-        'Content-Type': mimeType,
-        'Accept-Ranges': 'bytes',
-      });
-      const streamRes = await drive.files.get(
-        { fileId: req.params.fileId, alt: 'media' },
-        { responseType: 'stream' }
-      );
-      streamRes.data.pipe(res);
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Stream failed' });
-  }
-});
-
-// ── UPLOAD TRACK ──
+// ── UPLOAD ──
 app.post('/api/upload', upload.array('files'), async (req, res) => {
-  const { password } = req.body;
-  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
+  if (req.body.password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    const drive = getDrive();
-    const results = [];
-
+    let uploaded = 0;
     for (const file of req.files) {
-      const stream = Readable.from(file.buffer);
-      const response = await drive.files.create({
-        requestBody: {
-          name: file.originalname,
-          parents: [FOLDER_ID],
-        },
-        media: {
-          mimeType: file.mimetype,
-          body: stream,
-        },
-        fields: 'id, name',
-      });
-      results.push(response.data);
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(file.originalname, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true
+        });
+      if (!error) uploaded++;
     }
-
-    res.json({ ok: true, uploaded: results.length });
+    res.json({ ok: true, uploaded });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Upload failed' });
   }
 });
 
-// ── DELETE TRACK ──
-app.delete('/api/tracks/:fileId', async (req, res) => {
-  const { password } = req.body;
-  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
+// ── DELETE ──
+app.delete('/api/tracks/:filename', async (req, res) => {
+  if (req.body.password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    const drive = getDrive();
-    await drive.files.delete({ fileId: req.params.fileId });
+    const filename = decodeURIComponent(req.params.filename);
+    const { error } = await supabase.storage.from(BUCKET).remove([filename]);
+    if (error) throw error;
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
