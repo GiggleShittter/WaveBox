@@ -101,6 +101,23 @@ body {
     -webkit-background-clip: text; 
     -webkit-text-fill-color: transparent; 
 }
+    
+    .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 14px; /* Tight vertical gap */
+    margin-bottom: 2px; /* Pulls items together */
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    transition: 0.2s;
+}
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: var(--purple-glow); color: var(--purple-bright); }
+
 
 /* MAIN CONTENT */
 #main { 
@@ -411,6 +428,25 @@ let ctxTrackId = null;
 
 const audio = new Audio();
 audio.volume = volumeLevel;
+
+function trackRow(t, index, context) {
+    const isPlaying = currentTrackId === t.id;
+    const isLiked = liked.includes(t.id);
+    return `
+    <div class="track-row ${isPlaying ? 'playing' : ''}" onclick="playTrack('${t.id}', ${JSON.stringify(context).replace(/"/g, '&quot;')})">
+        <div style="text-align:center; font-size:12px;">${isPlaying ? '🔊' : index}</div>
+        <div class="track-art">${t.artUrl ? `<img src="${t.artUrl}">` : '🎵'}</div>
+        <div style="min-width:0; flex:1;">
+            <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${t.title}</div>
+            <div style="font-size:12px; color:var(--text-muted);">${t.artist}</div>
+        </div>
+        <div style="font-size:13px; color:var(--text-muted);">${t.album || 'Single'}</div>
+        <div style="font-size:13px; color:var(--text-muted);">${fmt(t.duration)}</div>
+        <button onclick="event.stopPropagation(); toggleLikeTrack('${t.id}')" style="background:none; border:none; cursor:pointer;">
+            ${isLiked ? '💜' : '🤍'}
+        </button>
+    </div>`;
+}
 
 // --- INITIALIZATION ---
 window.onload = () => {
