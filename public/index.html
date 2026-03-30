@@ -9,16 +9,27 @@
 :root{--bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--surface3:#22222f;--purple:#9b5de5;--purple-bright:#b97aff;--purple-dim:#6b3fa8;--purple-glow:rgba(155,93,229,0.15);--purple-glow2:rgba(155,93,229,0.06);--text:#f0eeff;--text-muted:#8888aa;--text-dim:#4a4a66;--border:rgba(155,93,229,0.12);--sidebar-w:240px;--player-h:88px;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body {
-  font-family:'DM Sans',sans-serif;
-  background:var(--bg);
-  color:var(--text);
-  height:100vh;
-  display:grid;
-  /* Sidebar | Resizer | Main */
-  grid-template-columns: var(--sidebar-w) 4px minmax(0, 1fr); 
-  grid-template-rows: 1fr var(--player-h);
-  overflow:hidden;
-  user-select:none;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: grid;
+  /* 1st row: Sidebar/Main | 2nd row: Player */
+  grid-template-rows: 1fr var(--player-h); 
+  grid-template-columns: var(--sidebar-w) 4px 1fr;
+  overflow: hidden;
+}
+
+#player {
+  grid-row: 2;
+  grid-column: 1 / -1; /* This forces it to span the whole bottom */
+  height: var(--player-h);
+  background: var(--surface);
+  display: grid; 
+  grid-template-columns: 1fr 2fr 1fr;
+  align-items: center;
+  padding: 0 24px;
+  border-top: 1px solid var(--border);
 }
 
 /* Add this right below body to make sure main is visible */
@@ -523,13 +534,22 @@ body {
       <span class="time" id="time-total">0:00</span>
     </div>
   </div>
-  <div class="volume-controls">
-    <button class="vol-btn" onclick="toggleMute()">
-      <svg viewBox="0 0 24 24" fill="currentColor" id="vol-icon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-    </button>
-    <div class="vol-track" onclick="setVolume(event)"><div class="vol-fill" id="vol-fill"></div></div>
+ <div class="volume-controls">
+  <button class="vol-btn" onclick="toggleAudioSettings()" title="Audio Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path>
+    </svg>
+  </button>
+
+  <button class="vol-btn" onclick="toggleMute()">
+    <svg viewBox="0 0 24 24" fill="currentColor" id="vol-icon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+  </button>
+
+  <div class="vol-track" onclick="setVolume(event)">
+    <div class="vol-fill" id="vol-fill"></div>
   </div>
-</footer>
+</div>
 
 <!-- MODALS -->
 <div class="modal-overlay" id="modal-playlist">
@@ -751,20 +771,58 @@ function renderPlaylistView(id){
   document.getElementById('pl-empty').style.display=pt.length?'none':'block';
 }
 
-function renderArtistView(artistName){
-  const at=tracks.filter(t=>t.artist===artistName);
-  document.getElementById('artist-name').textContent=artistName;
-  document.getElementById('artist-meta').textContent=`${at.length} song${at.length!==1?'s':''}`;
-  document.getElementById('artist-tracks').innerHTML=at.map((t,i)=>trackRow(t,i+1,at)).join('');
-  const key=artistName.replace(/[^a-zA-Z0-9]/g,'_');
-  const imgUrl=artistImages[key];
-  const cover=document.getElementById('artist-cover');
-  const emoji=document.getElementById('artist-cover-emoji');
-  const oldImg=cover.querySelector('img.cover-img');if(oldImg)oldImg.remove();
-  if(imgUrl){emoji.style.display='none';const img=document.createElement('img');img.className='cover-img';img.src=imgUrl;img.onerror=()=>{emoji.style.display='';img.remove();};cover.insertBefore(img,cover.firstChild);}
-  else emoji.style.display='';
-}
+function renderArtistView(artistName) {
+  const artistTracks = tracks.filter(t => t.artist === artistName);
+  
+  // Group tracks by album
+  const albums = {};
+  artistTracks.forEach(t => {
+    const albumName = t.album || "Single";
+    if (!albums[albumName]) albums[albumName] = [];
+    albums[albumName].push(t);
+  });
 
+  let html = '';
+  for (const album in albums) {
+    html += `
+      <div class="album-section" style="margin-bottom: 30px;">
+        <div style="display: flex; gap: 20px; align-items: flex-end; margin-bottom: 15px;">
+           <div class="track-art" style="width: 120px; height: 120px; font-size: 40px;">
+             ${trackArtHtml(albums[album][0])}
+           </div>
+           <div>
+             <h3 style="font-family: 'Syne'; font-size: 24px;">${esc(album)}</h3>
+             <p style="color: var(--text-dim); font-size: 14px;">Album • ${albums[album].length} songs</p>
+           </div>
+        </div>
+        <div class="track-list">
+          ${albums[album].map((t, i) => trackRow(t, i + 1, artistTracks)).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  document.getElementById('artist-name').textContent = artistName;
+  document.getElementById('artist-tracks').innerHTML = html;
+
+  // Cover Image Logic
+  const key = artistName.replace(/[^a-zA-Z0-9]/g, '_');
+  const imgUrl = artistImages[key];
+  const cover = document.getElementById('artist-cover');
+  const emoji = document.getElementById('artist-cover-emoji');
+  const oldImg = cover.querySelector('img.cover-img');
+  if(oldImg) oldImg.remove();
+  
+  if(imgUrl){
+    emoji.style.display = 'none';
+    const img = document.createElement('img');
+    img.className = 'cover-img';
+    img.src = imgUrl;
+    cover.insertBefore(img, cover.firstChild);
+  } else {
+    emoji.style.display = '';
+  }
+}
 function renderArtistGrid(filter=''){
   const artists=getArtists();
   const keys=Object.keys(artists).filter(a=>a.toLowerCase().includes(filter.toLowerCase())).sort((a,b)=>a.localeCompare(b));
@@ -1039,6 +1097,43 @@ function stopResize() {
     document.body.style.cursor = "default";
     document.body.style.userSelect = "";
 }
+
+/* --- PASTE EVERYTHING BELOW THIS LINE --- */
+
+let audioCtx, source, bassFilter;
+
+function initAudioContext() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  source = audioCtx.createMediaElementSource(audio);
+  bassFilter = audioCtx.createBiquadFilter();
+  bassFilter.type = "lowshelf";
+  bassFilter.frequency.value = 200;
+  bassFilter.gain.value = 0; 
+  source.connect(bassFilter);
+  bassFilter.connect(audioCtx.destination);
+}
+
+function toggleAudioSettings() {
+  const boost = prompt("Enter Bass Boost level (0 to 15):", "0");
+  if (boost !== null) {
+    const val = parseFloat(boost);
+    if(isNaN(val)) return;
+    initAudioContext();
+    bassFilter.gain.value = Math.min(15, Math.max(0, val));
+    showToast(`🔊 Bass Boost set to +${bassFilter.gain.value}dB`);
+  }
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('light-mode');
+  const isLight = document.body.classList.contains('light-mode');
+  localStorage.setItem('wb_theme', isLight ? 'light' : 'dark');
+}
+
+if(localStorage.getItem('wb_theme') === 'light') document.body.classList.add('light-mode');
+
+/* --- END OF NEW CODE --- */
     
 </script>
 </body>
