@@ -825,7 +825,7 @@ function renderPlaylistView(id){
 }
 
 function renderArtistView(artistName) {
-  // Safety check: if tracks haven't loaded yet, don't run
+  // 1. Safety Check: If tracks haven't loaded, stop here.
   if (!tracks || tracks.length === 0) return;
 
   const artistTracks = tracks.filter(t => t.artist === artistName);
@@ -840,15 +840,21 @@ function renderArtistView(artistName) {
   let html = '';
   for (const albumTitle in albums) {
     const firstTrack = albums[albumTitle][0];
+    
+    // 2. We use a simple image tag instead of trackArtHtml just in case it's broken
+    const artDisplay = (firstTrack && firstTrack.artUrl) 
+      ? `<img src="${firstTrack.artUrl}" style="width:100%;height:100%;object-fit:cover;">` 
+      : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#222;">🎵</div>`;
+
     html += `
       <div class="album-group" style="margin-bottom: 40px;">
         <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 15px; padding: 10px;">
-          <div class="album-mini-art" style="width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
-            ${trackArtHtml(firstTrack)}
+          <div style="width: 80px; height: 80px; border-radius: 4px; overflow: hidden;">
+            ${artDisplay}
           </div>
           <div>
-            <h2 style="margin:0; font-size: 22px; color: var(--text);">${esc(albumTitle)}</h2>
-            <p style="margin:5px 0 0 0; color: var(--text-dim); font-size: 14px;">Album • ${esc(artistName)}</p>
+            <h2 style="margin:0; font-size: 22px; color: #fff;">${albumTitle}</h2>
+            <p style="margin:5px 0 0 0; color: #b3b3b3; font-size: 14px;">Album • ${artistName}</p>
           </div>
         </div>
         <div class="track-list">
@@ -858,15 +864,15 @@ function renderArtistView(artistName) {
     `;
   }
   
-  // Safety checks for HTML elements
+  // 3. Check if the IDs actually exist before trying to use them
   const nameEl = document.getElementById('artist-name');
   const trackEl = document.getElementById('artist-tracks');
-  const coverEl = document.getElementById('artist-cover');
   
   if (nameEl) nameEl.textContent = artistName;
   if (trackEl) trackEl.innerHTML = html;
 
-  // Re-adding the cover image logic so it doesn't break
+  // 4. Update the Big Cover Image only if the element exists
+  const coverEl = document.getElementById('artist-cover');
   if (coverEl) {
     const key = artistName.replace(/[^a-zA-Z0-9]/g, '_');
     const imgUrl = artistImages[key];
@@ -880,6 +886,9 @@ function renderArtistView(artistName) {
         const img = document.createElement('img');
         img.className = 'cover-img';
         img.src = imgUrl;
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.objectFit = "cover";
         coverEl.insertBefore(img, coverEl.firstChild);
     } else {
         if(emojiEl) emojiEl.style.display = '';
