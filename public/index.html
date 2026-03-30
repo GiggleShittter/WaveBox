@@ -79,11 +79,13 @@ body {
 }
 /* Add this right below body to make sure main is visible */
 #main {
-  grid-column: 3; /* Explicitly tell it to stay in the 3rd column */
+  grid-column: 3;
+  grid-row: 1;             /* Force it to stay in the top row */
+  height: calc(100vh - 90px); /* Subtract the player bar height (90px) */
+  overflow-y: auto;        /* Let the tracks scroll inside this box */
+  overflow-x: hidden;
   min-width: 0;
   width: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 .nav-item {
     display: flex;
