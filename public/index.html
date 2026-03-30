@@ -8,17 +8,36 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Syne:wght@700&display=swap');
 
-:root {
-  --player-h: 90px; /* Make sure this is defined! */
+:root { --sidebar-w: 240px; }
+body {
+  grid-template-columns: var(--sidebar-w) 4px 1fr !important;
+}
+#sidebar { width: var(--sidebar-w); }
+#sidebar-resizer {
+  grid-column: 2;
+  background: var(--border);
+  transition: background 0.2s;
+}
+#sidebar-resizer:hover { background: var(--purple-bright); cursor: col-resize; }
+
+/* FIX: Player Bar Positioning */
+#player {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 90px;
+  background: var(--surface);
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  padding: 0 20px;
+  border-top: 1px solid var(--border);
+  z-index: 9999;
 }
 
-footer, #player {
-  grid-row: 2; /* Force it to the bottom row */
-  grid-column: 1 / -1; /* Force it to span the full width */
-  display: flex; /* Or grid */
-  height: var(--player-h);
-  position: relative;
-  z-index: 1000;
+/* Light Mode Support */
+body.light-mode {
+  --bg: #ffffff; --surface: #f3f3f3; --text: #121212; --text-muted: #555; --border: #ddd;
 }
 
 body {
@@ -1239,73 +1258,70 @@ if(savedPw){
     showLoginScreen();
 }
 
-// --- SIDEBAR RESIZER LOGIC ---
-const resizer = document.getElementById("sidebar-resizer");
+/* --- SIDEBAR RESIZER LOGIC --- */
+const resizer = document.getElementById('sidebar-resizer');
+let isResizing = false;
 
-if (resizer) {
-    resizer.addEventListener("mousedown", (e) => {
-        document.addEventListener("mousemove", resize);
-        document.addEventListener("mouseup", stopResize);
-        
-        // Visual feedback while dragging
-        document.body.style.cursor = "col-resize";
-        document.body.style.userSelect = "none";
-    });
-}
+resizer.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none'; // Stops text highlighting while dragging
+    e.preventDefault();
+});
 
-function resize(e) {
-    // Limits: Min 160px, Max 400px to keep the UI stable
-    if (e.clientX > 160 && e.clientX < 400) {
-        document.documentElement.style.setProperty('--sidebar-w', e.clientX + "px");
-    }
-}
+document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    let newWidth = e.clientX;
+    if (newWidth < 160) newWidth = 160; // Minimum width
+    if (newWidth > 500) newWidth = 500; // Maximum width
+    document.documentElement.style.setProperty('--sidebar-w', newWidth + 'px');
+});
 
-function stopResize() {
-    // Clean up ALL listeners to prevent memory leaks or "ghost" dragging
-    document.removeEventListener("mousemove", resize);
-    document.removeEventListener("mouseup", stopResize);
-    
-    document.body.style.cursor = "default";
-    document.body.style.userSelect = "";
-}
+document.addEventListener('mouseup', () => {
+    isResizing = false;
+    document.body.style.cursor = 'default';
+    document.body.style.userSelect = '';
+});
 
-/* --- PASTE EVERYTHING BELOW THIS LINE --- */
-
+/* --- AUDIO & THEME LOGIC --- */
 let audioCtx, source, bassFilter;
 
 function initAudioContext() {
-  if (audioCtx) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  source = audioCtx.createMediaElementSource(audio);
-  bassFilter = audioCtx.createBiquadFilter();
-  bassFilter.type = "lowshelf";
-  bassFilter.frequency.value = 200;
-  bassFilter.gain.value = 0; 
-  source.connect(bassFilter);
-  bassFilter.connect(audioCtx.destination);
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    source = audioCtx.createMediaElementSource(audio);
+    bassFilter = audioCtx.createBiquadFilter();
+    bassFilter.type = "lowshelf";
+    bassFilter.frequency.value = 200;
+    source.connect(bassFilter);
+    bassFilter.connect(audioCtx.destination);
 }
 
 function toggleAudioSettings() {
-  const boost = prompt("Enter Bass Boost level (0 to 15):", "0");
-  if (boost !== null) {
-    const val = parseFloat(boost);
-    if(isNaN(val)) return;
-    initAudioContext();
-    bassFilter.gain.value = Math.min(15, Math.max(0, val));
-    showToast(`🔊 Bass Boost set to +${bassFilter.gain.value}dB`);
-  }
+    const boost = prompt("Enter Bass Boost level (0 to 15):", "0");
+    if (boost !== null) {
+        const val = parseFloat(boost);
+        if (isNaN(val)) return;
+        initAudioContext();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        bassFilter.gain.value = Math.min(15, Math.max(0, val));
+        showToast(`🔊 Bass Boost: +${bassFilter.gain.value}dB`);
+    }
 }
 
 function toggleTheme() {
-  document.body.classList.toggle('light-mode');
-  const isLight = document.body.classList.contains('light-mode');
-  localStorage.setItem('wb_theme', isLight ? 'light' : 'dark');
+    document.body.classList.toggle('light-mode');
+    const isLight = document.body.classList.contains('light-mode');
+    localStorage.setItem('wb_theme', isLight ? 'light' : 'dark');
+    showToast(isLight ? "☀️ Light Mode" : "🌙 Dark Mode");
 }
 
-if(localStorage.getItem('wb_theme') === 'light') document.body.classList.add('light-mode');
+// Load saved theme on startup
+if (localStorage.getItem('wb_theme') === 'light') document.body.classList.add('light-mode');
 
-/* --- END OF NEW CODE --- */
-    
+/* --- END OF CODE --- */
+
 </script>
+</footer>
 </body>
 </html>
