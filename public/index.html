@@ -896,24 +896,7 @@ function renderArtistView(artistName) {
   }
 }
 
-  // Cover Image Logic
-  const key = artistName.replace(/[^a-zA-Z0-9]/g, '_');
-  const imgUrl = artistImages[key];
-  const cover = document.getElementById('artist-cover');
-  const emoji = document.getElementById('artist-cover-emoji');
-  const oldImg = cover.querySelector('img.cover-img');
-  if(oldImg) oldImg.remove();
-  
-  if(imgUrl){
-    emoji.style.display = 'none';
-    const img = document.createElement('img');
-    img.className = 'cover-img';
-    img.src = imgUrl;
-    cover.insertBefore(img, cover.firstChild);
-  } else {
-    emoji.style.display = '';
-  }
-}
+
 function renderArtistGrid(filter=''){
   const artists=getArtists();
   const keys=Object.keys(artists).filter(a=>a.toLowerCase().includes(filter.toLowerCase())).sort((a,b)=>a.localeCompare(b));
@@ -1099,21 +1082,84 @@ function handleSearch(q){
   document.getElementById('search-empty').style.display=results.length?'none':'flex';
 }
 
-// CTX MENU
-function openCtx(e,id){
-  e.preventDefault();e.stopPropagation();ctxTrackId=id;
-  const menu=document.getElementById('ctx-menu');
-  menu.style.left=Math.min(e.clientX,window.innerWidth-210)+'px';
-  menu.style.top=Math.min(e.clientY,window.innerHeight-200)+'px';
+// --- CONTEXT MENU ---
+function openCtx(e, id) {
+  e.preventDefault(); e.stopPropagation(); ctxTrackId = id;
+  const menu = document.getElementById('ctx-menu');
+  if (!menu) return;
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 210) + 'px';
+  menu.style.top = Math.min(e.clientY, window.innerHeight - 200) + 'px';
   menu.classList.add('open');
-  document.getElementById('ctx-delete').style.display=isAdmin?'flex':'none';
-  document.getElementById('ctx-art').style.display=isAdmin?'flex':'none';
+  // Only show Admin options if logged in
+  const delBtn = document.getElementById('ctx-delete');
+  const artBtn = document.getElementById('ctx-art');
+  if (delBtn) delBtn.style.display = isAdmin ? 'flex' : 'none';
+  if (artBtn) artBtn.style.display = isAdmin ? 'flex' : 'none';
 }
-document.addEventListener('click',()=>document.getElementById('ctx-menu').classList.remove('open'));
-function ctxPlay(){if(ctxTrackId)playTrack(ctxTrackId,tracks.map(t=>t.id));}
-function ctxQueue(){const t=tracks.find(t=>t.id===ctxTrackId);if(t){queue.push(t);showToast(`"${t.title}" added to queue`);}}
-function ctxLike(){if(ctxTrackId)toggleLikeTrack(ctxTrackId);}
-function ctxDelete(){
+
+document.addEventListener('click', () => {
+  const menu = document.getElementById('ctx-menu');
+  if (menu) menu.classList.remove('open');
+});
+
+function ctxPlay() { if (ctxTrackId) playTrack(ctxTrackId, tracks.map(t => t.id)); }
+
+function ctxQueue() {
+  const t = tracks.find(t => t.id === ctxTrackId);
+  if (t) { queue.push(t); showToast(`"${t.title}" added to queue`); }
+}
+
+function ctxLike() { if (ctxTrackId) toggleLikeTrack(ctxTrackId); }
+
+function ctxDelete() {
+  if (!isAdmin || !ctxTrackId) return;
+  const t = tracks.find(t => t.id === ctxTrackId);
+  if (!t) return;
+  if (!confirm(`Delete "${t.title}" permanently?`)) return;
+
+  fetch(`/api/tracks/${encodeURIComponent(t.name)}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: adminPassword })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      if (currentTrackId === ctxTrackId) { audio.pause(); currentTrackId = null; }
+      liked = liked.filter(l => l !== ctxTrackId);
+      playlists.forEach(p => { p.tracks = p.tracks.filter(tid => tid !== ctxTrackId); });
+      localStorage.setItem('wb_liked', JSON.stringify(liked));
+      localStorage.setItem('wb_playlists', JSON.stringify(playlists));
+      showToast(`Deleted "${t.title}"`);
+      loadAll();
+    }
+  });
+} // <-- Added the missing bracket here!
+
+function ctxAddPlaylist() {
+  if (!playlists.length) { showToast('Create a playlist first'); return; }
+  const list = document.getElementById('add-playlist-list');
+  list.innerHTML = playlists.map(p => `
+    <div class="ctx-item" onclick="addToPlaylist('${p.id}')" style="border-radius:8px">
+      ${esc(p.name)}
+    </div>`).join('');
+  document.getElementById('modal-add-playlist').classList.add('open');
+}
+
+function addToPlaylist(plId) {
+  const pl = playlists.find(p => p.id === plId);
+  if (!pl || !ctxTrackId) return;
+  if (!pl.tracks.includes(ctxTrackId)) {
+    pl.tracks.push(ctxTrackId);
+    localStorage.setItem('wb_playlists', JSON.stringify(playlists));
+    renderAll();
+    showToast(`Added to "${pl.name}"`);
+  } else {
+    showToast('Already in this playlist');
+  }
+  closeModal('modal-add-playlist');
+}
+  
   if(!isAdmin||!ctxTrackId)return;
   const t=tracks.find(t=>t.id===ctxTrackId);if(!t)return;
   fetch(`/api/tracks/${encodeURIComponent(t.name)}`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:adminPassword})})
