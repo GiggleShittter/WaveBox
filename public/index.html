@@ -6,6 +6,34 @@
 <title>WaveBox</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Syne:wght@700&display=swap');
+
+:root {
+  --player-h: 90px; /* Make sure this is defined! */
+}
+
+footer, #player {
+  grid-row: 2; /* Force it to the bottom row */
+  grid-column: 1 / -1; /* Force it to span the full width */
+  display: flex; /* Or grid */
+  height: var(--player-h);
+  position: relative;
+  z-index: 1000;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: grid;
+  /* Fixed Row 1 (Main) and Row 2 (Player) */
+  grid-template-rows: calc(100vh - var(--player-h)) var(--player-h);
+  grid-template-columns: var(--sidebar-w) 4px 1fr;
+  overflow: hidden;
+}
 :root{--bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--surface3:#22222f;--purple:#9b5de5;--purple-bright:#b97aff;--purple-dim:#6b3fa8;--purple-glow:rgba(155,93,229,0.15);--purple-glow2:rgba(155,93,229,0.06);--text:#f0eeff;--text-muted:#8888aa;--text-dim:#4a4a66;--border:rgba(155,93,229,0.12);--sidebar-w:240px;--player-h:88px;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body {
@@ -651,11 +679,17 @@ function skipLogin(){document.getElementById('login-screen').classList.remove('s
 document.getElementById('login-input').addEventListener('keydown',e=>{if(e.key==='Enter')attemptLogin();});
 
 // LOAD
-function loadAll(){
-  Promise.all([
-    fetch('/api/tracks/full').then(r=>r.json()).catch(()=>fetch('/api/tracks').then(r=>r.json())),
-    fetch('/api/artist-images').then(r=>r.json()).catch(()=>({}))
-  ]).then(([t,ai])=>{tracks=t;artistImages=ai;renderAll();}).catch(()=>showToast('Could not load tracks'));
+function loadAll() {
+  fetch('/api/tracks/full')
+    .then(r => r.json())
+    .then(t => {
+      tracks = t;
+      renderAll(); // This fills your screen with music
+    })
+    .catch(err => {
+      console.error(err);
+      showToast("Error loading music");
+    });
 }
 
 // UPLOAD TRACKS
@@ -791,12 +825,13 @@ function renderPlaylistView(id){
 }
 
 function renderArtistView(artistName) {
+  // Safety check: if tracks haven't loaded yet, don't run
+  if (!tracks || tracks.length === 0) return;
+
   const artistTracks = tracks.filter(t => t.artist === artistName);
-  
-  // This "buckets" tracks by their actual .album property
   const albums = {};
+  
   artistTracks.forEach(t => {
-    // If the file doesn't have an album name, we call it 'Singles'
     const albumName = t.album || "Singles"; 
     if (!albums[albumName]) albums[albumName] = [];
     albums[albumName].push(t);
@@ -808,12 +843,12 @@ function renderArtistView(artistName) {
     html += `
       <div class="album-group" style="margin-bottom: 40px;">
         <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 15px; padding: 10px;">
-          <div class="album-mini-art" style="width: 80px; height: 80px; background: var(--surface3); border-radius: 4px; overflow: hidden;">
+          <div class="album-mini-art" style="width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
             ${trackArtHtml(firstTrack)}
           </div>
           <div>
-            <h2 style="margin:0; font-size: 22px;">${esc(albumTitle)}</h2>
-            <p style="margin:5px 0 0 0; color: var(--text-dim); font-size: 14px;">Album • ${artistName}</p>
+            <h2 style="margin:0; font-size: 22px; color: var(--text);">${esc(albumTitle)}</h2>
+            <p style="margin:5px 0 0 0; color: var(--text-dim); font-size: 14px;">Album • ${esc(artistName)}</p>
           </div>
         </div>
         <div class="track-list">
@@ -823,8 +858,33 @@ function renderArtistView(artistName) {
     `;
   }
   
-  document.getElementById('artist-name').textContent = artistName;
-  document.getElementById('artist-tracks').innerHTML = html;
+  // Safety checks for HTML elements
+  const nameEl = document.getElementById('artist-name');
+  const trackEl = document.getElementById('artist-tracks');
+  const coverEl = document.getElementById('artist-cover');
+  
+  if (nameEl) nameEl.textContent = artistName;
+  if (trackEl) trackEl.innerHTML = html;
+
+  // Re-adding the cover image logic so it doesn't break
+  if (coverEl) {
+    const key = artistName.replace(/[^a-zA-Z0-9]/g, '_');
+    const imgUrl = artistImages[key];
+    const emojiEl = document.getElementById('artist-cover-emoji');
+    
+    const oldImg = coverEl.querySelector('img.cover-img');
+    if(oldImg) oldImg.remove();
+
+    if(imgUrl) {
+        if(emojiEl) emojiEl.style.display = 'none';
+        const img = document.createElement('img');
+        img.className = 'cover-img';
+        img.src = imgUrl;
+        coverEl.insertBefore(img, coverEl.firstChild);
+    } else {
+        if(emojiEl) emojiEl.style.display = '';
+    }
+  }
 }
 
   // Cover Image Logic
