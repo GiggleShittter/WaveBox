@@ -8,9 +8,18 @@
 <style>
 :root{--bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--surface3:#22222f;--purple:#9b5de5;--purple-bright:#b97aff;--purple-dim:#6b3fa8;--purple-glow:rgba(155,93,229,0.15);--purple-glow2:rgba(155,93,229,0.06);--text:#f0eeff;--text-muted:#8888aa;--text-dim:#4a4a66;--border:rgba(155,93,229,0.12);--sidebar-w:240px;--player-h:88px;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:grid;grid-template-columns:var(--sidebar-w) 1fr;grid-template-rows:1fr var(--player-h);overflow:hidden;user-select:none;
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  height:100vh;
+  display:grid;
+  /* ADDED 4px HERE FOR THE RESIZER */
+  grid-template-columns:var(--sidebar-w) 4px 1fr; 
+  grid-template-rows:1fr var(--player-h);
+  overflow:hidden;
+  user-select:none;
 }
-
 .nav-item {
     display: flex;
     align-items: center;
@@ -312,6 +321,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);hei
     New Playlist
   </button>
 </aside>
+<div id="sidebar-resizer" style="width:4px; cursor:col-resize; background:var(--border); z-index:100;"></div>
 
 <main id="main">
 
@@ -809,17 +819,45 @@ function playTrack(id,contextIds){
   queueIndex=queue.findIndex(t=>t.id===id);loadAndPlay(track);
 }
 function loadAndPlay(track){
-  currentTrackId=track.id;audio.src=track.streamUrl;audio.play();
+  currentTrackId=track.id;
+  audio.src=track.streamUrl;
+  audio.play();
+
+  // --- START VOLUME POP-UP FIX ---
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title,
+      artist: track.artist,
+      album: 'WaveBox',
+      artwork: [
+        { src: track.artUrl || '', sizes: '512x512', type: 'image/png' }
+      ]
+    });
+  }
+  // --- END VOLUME POP-UP FIX ---
+
   document.getElementById('now-title').textContent=track.title;
   document.getElementById('now-artist').textContent=track.artist;
   const nowArt=document.getElementById('now-art');
   const nowEmoji=document.getElementById('now-art-emoji');
   const oldImg=nowArt.querySelector('img');if(oldImg)oldImg.remove();
-  if(track.artUrl){nowEmoji.style.display='none';const img=document.createElement('img');img.src=track.artUrl;img.onerror=()=>{nowEmoji.style.display='';img.remove();};nowArt.appendChild(img);}
-  else nowEmoji.style.display='';
+  if(track.artUrl){
+    nowEmoji.style.display='none';
+    const img=document.createElement('img');
+    img.src=track.artUrl;
+    img.onerror=()=>{nowEmoji.style.display='';img.remove();};
+    nowArt.appendChild(img);
+  } else {
+    nowEmoji.style.display='';
+  }
   const likeIcon=document.getElementById('like-icon');
-  if(liked.includes(track.id)){likeIcon.setAttribute('fill','var(--purple-bright)');likeIcon.setAttribute('stroke','none');}
-  else{likeIcon.setAttribute('fill','none');likeIcon.setAttribute('stroke','currentColor');}
+  if(liked.includes(track.id)){
+    likeIcon.setAttribute('fill','var(--purple-bright)');
+    likeIcon.setAttribute('stroke','none');
+  } else {
+    likeIcon.setAttribute('fill','none');
+    likeIcon.setAttribute('stroke','currentColor');
+  }
   renderAll();
 }
 function togglePlay(){if(audio.src)audio.paused?audio.play():audio.pause();}
@@ -959,7 +997,35 @@ if(savedPw){
       if(data.ok){isAdmin=true;adminPassword=savedPw;document.getElementById('admin-badge').style.display='inline';document.getElementById('upload-btn').style.display='flex';document.getElementById('artist-cover-upload').style.display='flex';setupDragDrop();}
       loadAll();
     }).catch(()=>loadAll());
-}else{showLoginScreen();}
+}else{
+    showLoginScreen();
+}
+
+// --- SIDEBAR RESIZER LOGIC ---
+const resizer = document.getElementById("sidebar-resizer");
+if (resizer) {
+    resizer.addEventListener("mousedown", (e) => {
+        document.addEventListener("mousemove", resize);
+        document.addEventListener("mouseup", stopResize);
+        // This stops the mouse from highlighting text while you drag
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+    });
+}
+
+function resize(e) {
+    // This keeps the sidebar between 160px and 400px so it doesn't break
+    if (e.clientX > 160 && e.clientX < 400) {
+        document.documentElement.style.setProperty('--sidebar-w', e.clientX + "px");
+    }
+}
+
+function stopResize() {
+    document.removeEventListener("mousemove", resize);
+    document.body.style.cursor = "default";
+    document.body.style.userSelect = "";
+}
+    
 </script>
 </body>
 </html>
