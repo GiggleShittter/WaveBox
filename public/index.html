@@ -14,10 +14,20 @@ body {
   color:var(--text);
   height:100vh;
   display:grid;
-  grid-template-columns:var(--sidebar-w) 4px 1fr;
-  grid-template-rows:1fr var(--player-h);
+  /* Sidebar | Resizer | Main */
+  grid-template-columns: var(--sidebar-w) 4px minmax(0, 1fr); 
+  grid-template-rows: 1fr var(--player-h);
   overflow:hidden;
   user-select:none;
+}
+
+/* Add this right below body to make sure main is visible */
+#main {
+  grid-column: 3; /* Explicitly tell it to stay in the 3rd column */
+  min-width: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .nav-item {
     display: flex;
@@ -320,7 +330,7 @@ body {
     New Playlist
   </button>
 </aside>
-<div id="sidebar-resizer" style="width:4px; cursor:col-resize; background:var(--border); z-index:100;"></div>
+<div id="sidebar-resizer" style="width:4px; cursor:col-resize; background:rgba(155,93,229,0.15); z-index:100; height:100vh;"></div>
 
 <main id="main">
 
@@ -1002,25 +1012,30 @@ if(savedPw){
 
 // --- SIDEBAR RESIZER LOGIC ---
 const resizer = document.getElementById("sidebar-resizer");
+
 if (resizer) {
     resizer.addEventListener("mousedown", (e) => {
         document.addEventListener("mousemove", resize);
         document.addEventListener("mouseup", stopResize);
-        // This stops the mouse from highlighting text while you drag
+        
+        // Visual feedback while dragging
         document.body.style.cursor = "col-resize";
         document.body.style.userSelect = "none";
     });
 }
 
 function resize(e) {
-    // This keeps the sidebar between 160px and 400px so it doesn't break
+    // Limits: Min 160px, Max 400px to keep the UI stable
     if (e.clientX > 160 && e.clientX < 400) {
         document.documentElement.style.setProperty('--sidebar-w', e.clientX + "px");
     }
 }
 
 function stopResize() {
+    // Clean up ALL listeners to prevent memory leaks or "ghost" dragging
     document.removeEventListener("mousemove", resize);
+    document.removeEventListener("mouseup", stopResize);
+    
     document.body.style.cursor = "default";
     document.body.style.userSelect = "";
 }
