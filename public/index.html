@@ -6,99 +6,71 @@
 <title>WaveBox</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Syne:wght@700&display=swap');
-
-:root { --sidebar-w: 240px; }
-body {
-  grid-template-columns: var(--sidebar-w) 4px 1fr !important;
+/* ── VARIABLES & RESET ── */
+:root{
+  --bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--surface3:#22222f;
+  --purple:#9b5de5;--purple-bright:#b97aff;--purple-dim:#6b3fa8;
+  --purple-glow:rgba(155,93,229,0.15);--purple-glow2:rgba(155,93,229,0.06);
+  --text:#f0eeff;--text-muted:#8888aa;--text-dim:#4a4a66;
+  --border:rgba(155,93,229,0.12);--sidebar-w:240px;--player-h:90px;
 }
-#sidebar { width: var(--sidebar-w); }
-#sidebar-resizer {
-  grid-column: 2;
-  background: var(--border);
-  transition: background 0.2s;
-}
-#sidebar-resizer:hover { background: var(--purple-bright); cursor: col-resize; }
-
-/* FIX: Player Bar Positioning */
-#player {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 90px;
-  background: var(--surface);
-  display: grid;
-  grid-template-columns: 1fr 2fr 1fr;
-  padding: 0 20px;
-  border-top: 1px solid var(--border);
-  z-index: 9999;
-}
-
-/* Light Mode Support */
-body.light-mode {
-  --bg: #ffffff; --surface: #f3f3f3; --text: #121212; --text-muted: #555; --border: #ddd;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  height: 100vh;
-  display: grid;
-  /* Fixed Row 1 (Main) and Row 2 (Player) */
-  grid-template-rows: calc(100vh - var(--player-h)) var(--player-h);
-  grid-template-columns: var(--sidebar-w) 4px 1fr;
-  overflow: hidden;
-}
-:root{--bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--surface3:#22222f;--purple:#9b5de5;--purple-bright:#b97aff;--purple-dim:#6b3fa8;--purple-glow:rgba(155,93,229,0.15);--purple-glow2:rgba(155,93,229,0.06);--text:#f0eeff;--text-muted:#8888aa;--text-dim:#4a4a66;--border:rgba(155,93,229,0.12);--sidebar-w:240px;--player-h:88px;}
 *{box-sizing:border-box;margin:0;padding:0;}
-body {
-  display: grid;
-  /* Fixed height for player at the bottom, 1fr for the rest */
-  grid-template-rows: 1fr 90px; 
-  grid-template-columns: var(--sidebar-w) 4px 1fr;
-  height: 100vh;
-  margin: 0;
-  overflow: hidden;
+
+/* Light Mode */
+body.light-mode{
+  --bg:#ffffff;--surface:#f3f3f3;--surface2:#e8e8e8;--surface3:#ddd;
+  --text:#121212;--text-muted:#555;--text-dim:#888;--border:#ddd;
 }
 
-#player {
-  grid-row: 2;
-  grid-column: 1 / 4; /* Spans across Sidebar, Resizer, and Main */
-  height: 90px;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  display: grid;
-  grid-template-columns: 1fr 2fr 1fr;
-  align-items: center;
-  padding: 0 20px;
-  z-index: 1000; /* Ensures it sits on top of everything */
+/* ── BODY GRID: sidebar | resizer | main / player full-width ── */
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg);color:var(--text);
+  height:100vh;overflow:hidden;
+  display:grid;
+  grid-template-columns:var(--sidebar-w) 4px 1fr;
+  grid-template-rows:1fr var(--player-h);
 }
-/* Add this right below body to make sure main is visible */
-#main {
-  grid-column: 3;
-  grid-row: 1;             /* Force it to stay in the top row */
-  height: calc(100vh - 90px); /* Subtract the player bar height (90px) */
-  overflow-y: auto;        /* Let the tracks scroll inside this box */
-  overflow-x: hidden;
-  min-width: 0;
-  width: 100%;
+
+/* ── SIDEBAR ── */
+#sidebar{
+  grid-column:1;grid-row:1;
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
 }
-.nav-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 6px 14px;  /* Tighter padding */
-    margin-bottom: 2px; /* Small gap between buttons */
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.15s;
-    color: var(--text-muted);
-    font-size: 14px;
-    font-weight: 500;
+
+/* ── RESIZER ── */
+#sidebar-resizer{
+  grid-column:2;grid-row:1;
+  background:var(--border);cursor:col-resize;
+  transition:background 0.2s;z-index:10;
+}
+#sidebar-resizer:hover{background:var(--purple-bright);}
+
+/* ── MAIN ── */
+#main{
+  grid-column:3;grid-row:1;
+  overflow-y:auto;overflow-x:hidden;
+  background:var(--bg);min-width:0;
+}
+#main::-webkit-scrollbar{width:6px;}
+#main::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px;}
+
+/* ── PLAYER ── */
+#player{
+  grid-column:1/-1;grid-row:2;
+  background:var(--surface);border-top:1px solid var(--border);
+  display:grid;grid-template-columns:1fr 2fr 1fr;
+  align-items:center;padding:0 24px;gap:16px;
+  position:relative;z-index:1000;
+}
+#player::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--purple-dim),transparent);opacity:.5;}
+
+/* ── NAV ITEMS ── */
+.nav-item{
+  display:flex;align-items:center;gap:12px;
+  padding:9px 12px;border-radius:8px;cursor:pointer;
+  transition:all 0.15s;color:var(--text-muted);font-size:14px;font-weight:500;
 }
 
 /* LOGIN */
@@ -117,8 +89,7 @@ body {
 .login-skip{font-size:13px;color:var(--text-dim);text-align:center;cursor:pointer;transition:color 0.15s;}
 .login-skip:hover{color:var(--text-muted);}
 
-/* SIDEBAR */
-#sidebar{grid-row:1/2;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+/* SIDEBAR styles (grid placement set above) */
 .logo{padding:20px 20px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);}
 .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--purple),var(--purple-bright));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 16px rgba(155,93,229,0.4);flex-shrink:0;}
 .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;letter-spacing:-0.5px;background:linear-gradient(135deg,var(--purple-bright),#e0c8ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
@@ -160,10 +131,6 @@ body {
 .new-playlist-btn{margin:6px 12px 14px;padding:8px 12px;border:1px dashed var(--border);border-radius:8px;cursor:pointer;color:var(--text-muted);font-size:13px;display:flex;align-items:center;gap:8px;transition:all 0.15s;background:transparent;width:calc(100% - 24px);}
 .new-playlist-btn:hover{border-color:var(--purple-dim);color:var(--purple-bright);background:var(--purple-glow2);}
 
-/* MAIN */
-#main{grid-row:1/2;overflow-y:auto;overflow-x:hidden;background:var(--bg);}
-#main::-webkit-scrollbar{width:6px;}
-#main::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px;}
 .main-header{position:sticky;top:0;z-index:10;background:rgba(10,10,15,0.88);backdrop-filter:blur(20px);padding:14px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);}
 .search-bar{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:24px;padding:8px 16px;flex:1;max-width:320px;transition:all 0.2s;}
 .search-bar:focus-within{border-color:var(--purple-dim);box-shadow:0 0 0 3px var(--purple-glow2);}
@@ -261,9 +228,6 @@ body {
 .shuffle-btn{display:flex;align-items:center;gap:8px;padding:11px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:30px;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all 0.15s;}
 .shuffle-btn:hover{border-color:var(--purple-dim);color:var(--purple-bright);}
 
-/* PLAYER */
-#player{grid-column:1/-1;background:var(--surface);border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 2fr 1fr;align-items:center;padding:0 24px;gap:16px;position:relative;z-index:20;}
-#player::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--purple-dim),transparent);opacity:.5;}
 .now-playing{display:flex;align-items:center;gap:12px;min-width:0;}
 .now-art{width:52px;height:52px;border-radius:8px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,0.4);overflow:hidden;}
 .now-art img{width:100%;height:100%;object-fit:cover;}
@@ -350,7 +314,7 @@ body {
 .drag-icon{font-size:64px;}
 .drag-text{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;color:var(--purple-bright);}
 .scroll-pad{height:24px;}
-@media(max-width:600px){:root{--sidebar-w:0px;}#sidebar{display:none;}body{grid-template-columns:1fr;}}
+@media(max-width:600px){:root{--sidebar-w:0px;}#sidebar,#sidebar-resizer{display:none;}body{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
