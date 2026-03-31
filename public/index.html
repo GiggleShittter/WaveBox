@@ -152,6 +152,8 @@ body{
 .search-bar:focus-within{border-color:var(--purple-dim);box-shadow:0 0 0 3px var(--purple-glow2);}
 .search-bar input{background:none;border:none;outline:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;width:100%;}
 .search-bar input::placeholder{color:var(--text-dim);}
+.refresh-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:8px;border-radius:50%;transition:all 0.15s;margin-left:auto;display:flex;align-items:center;justify-content:center;}
+.refresh-btn:hover{color:var(--text);background:var(--surface2);transform:rotate(180deg);}
 .upload-btn{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--purple),var(--purple-bright));border:none;border-radius:24px;padding:9px 18px;color:white;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 15px rgba(155,93,229,0.3);white-space:nowrap;margin-left:auto;}
 .upload-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(155,93,229,0.4);}
 #file-input,#artist-img-input,#track-art-input{display:none;}
@@ -426,9 +428,13 @@ body{
     <div class="main-header">
       <div class="search-bar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;color:var(--text-dim);flex-shrink:0"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
-        <input type="text" placeholder="Search your music..." id="search-input" oninput="handleSearch(this.value)">
+        <input type="text" id="search-input" placeholder="Search tracks, artists, albums..." oninput="handleSearch(this.value)" onkeydown="if(event.key==='Enter')handleSearch(this.value)">
       </div>
-      <button class="upload-btn" id="upload-btn" onclick="document.getElementById('file-input').click()" style="display:none">
+      <button class="refresh-btn" onclick="refreshHomeContent()" title="Refresh content">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M23 4v6h-6M1 20v-6h6M3.49 9.69A9 9 0 1 1 18.31 9.69A9 9 0 0 1 3.49 9.69A9 9 0 0 1 12 3a9 9 0 0 1 8.51 6.69M12 3v6l3.5-3.5"/></svg>
+      </button>
+    </div>
+    <button class="upload-btn" id="upload-btn" onclick="document.getElementById('file-input').click()" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Upload
       </button>
@@ -866,10 +872,19 @@ function renderHome(){
   // Show random 5 songs
   const shuffledTracks = [...tracks].sort(() => 0.5 - Math.random());
   const randomTracks = shuffledTracks.slice(0, 5);
-  document.getElementById('all-tracks').innerHTML=randomTracks.map((t,i)=>trackRow(t,i+1,randomTracks)).join('');
+  document.getElementById('all-tracks').innerHTML=randomTracks.map((t,i)=>compactTrackRow(t,i+1,randomTracks)).join('');
   
   // Render random albums section
   renderRandomAlbums();
+}
+
+function refreshHomeContent() {
+  // Re-render albums and recent songs without affecting sidebar
+  renderRandomAlbums();
+  const shuffledTracks = [...tracks].sort(() => 0.5 - Math.random());
+  const randomTracks = shuffledTracks.slice(0, 5);
+  document.getElementById('all-tracks').innerHTML=randomTracks.map((t,i)=>compactTrackRow(t,i+1,randomTracks)).join('');
+  showToast('🔄 Content refreshed');
 }
 
 function renderRandomAlbums(){
@@ -1477,6 +1492,15 @@ function toggleTheme() {
 
 // Load saved theme on startup
 if (localStorage.getItem('wb_theme') === 'light') document.body.classList.add('light-mode');
+
+// GLOBAL KEYBOARD CONTROLS
+document.addEventListener('keydown', (e) => {
+  // Spacebar toggle - only if not typing in input
+  if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+    e.preventDefault();
+    togglePlay();
+  }
+});
 
 /* --- END OF CODE --- */
 
