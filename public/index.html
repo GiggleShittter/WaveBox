@@ -581,7 +581,14 @@ body{
   <div class="vol-track" onclick="setVolume(event)">
     <div class="vol-fill" id="vol-fill"></div>
   </div>
+
+  <!-- Theme toggle button -->
+  <button class="vol-btn" onclick="toggleTheme()" title="Toggle Theme" style="margin-left:4px">
+    <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px"><path d="M12 3a6 6 0 009 5.197A9 9 0 1112 3z"/></svg>
+  </button>
 </div>
+
+</footer>
 
 <!-- MODALS -->
 <div class="modal-overlay" id="modal-playlist">
@@ -665,16 +672,17 @@ document.getElementById('login-input').addEventListener('keydown',e=>{if(e.key==
 
 // LOAD
 function loadAll() {
-  fetch('/api/tracks/full')
-    .then(r => r.json())
-    .then(t => {
-      tracks = t;
-      renderAll(); // This fills your screen with music
-    })
-    .catch(err => {
-      console.error(err);
-      showToast("Error loading music");
-    });
+  Promise.all([
+    fetch('/api/tracks/full').then(r=>r.json()).catch(()=>fetch('/api/tracks').then(r=>r.json())),
+    fetch('/api/artist-images').then(r=>r.json()).catch(()=>({}))
+  ]).then(([t, ai]) => {
+    tracks = t;
+    artistImages = ai;
+    renderAll();
+  }).catch(err => {
+    console.error(err);
+    showToast("Error loading music");
+  });
 }
 
 // UPLOAD TRACKS
@@ -825,21 +833,19 @@ function renderArtistView(artistName) {
   let html = '';
   for (const albumTitle in albums) {
     const firstTrack = albums[albumTitle][0];
-    
-    // 2. We use a simple image tag instead of trackArtHtml just in case it's broken
     const artDisplay = (firstTrack && firstTrack.artUrl) 
       ? `<img src="${firstTrack.artUrl}" style="width:100%;height:100%;object-fit:cover;">` 
       : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#222;">🎵</div>`;
 
     html += `
-      <div class="album-group" style="margin-bottom: 40px;">
-        <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 15px; padding: 10px;">
-          <div style="width: 80px; height: 80px; border-radius: 4px; overflow: hidden;">
+      <div class="album-group" style="margin-bottom:32px;">
+        <div style="display:flex;gap:20px;align-items:center;margin-bottom:12px;padding:0 10px;">
+          <div style="width:80px;height:80px;border-radius:6px;overflow:hidden;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,0.4);">
             ${artDisplay}
           </div>
           <div>
-            <h2 style="margin:0; font-size: 22px; color: #fff;">${albumTitle}</h2>
-            <p style="margin:5px 0 0 0; color: #b3b3b3; font-size: 14px;">Album • ${artistName}</p>
+            <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--text);">${esc(albumTitle)}</div>
+            <div style="margin-top:4px;color:var(--text-muted);font-size:13px;">Album · ${esc(artistName)}</div>
           </div>
         </div>
         <div class="track-list">
@@ -849,11 +855,12 @@ function renderArtistView(artistName) {
     `;
   }
   
-  // 3. Check if the IDs actually exist before trying to use them
   const nameEl = document.getElementById('artist-name');
+  const metaEl = document.getElementById('artist-meta');
   const trackEl = document.getElementById('artist-tracks');
   
   if (nameEl) nameEl.textContent = artistName;
+  if (metaEl) metaEl.textContent = `${artistTracks.length} song${artistTracks.length!==1?'s':''}`;
   if (trackEl) trackEl.innerHTML = html;
 
   // 4. Update the Big Cover Image only if the element exists
@@ -1288,6 +1295,5 @@ if (localStorage.getItem('wb_theme') === 'light') document.body.classList.add('l
 /* --- END OF CODE --- */
 
 </script>
-</footer>
 </body>
 </html>
