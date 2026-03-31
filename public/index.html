@@ -214,6 +214,12 @@ body{
 .track-action-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px 5px;border-radius:4px;font-size:13px;line-height:1;transition:all 0.15s;}
 .track-action-btn:hover{color:var(--purple-bright);background:var(--purple-glow);}
 
+/* COMPACT TRACK ROWS */
+.compact-track-row:hover{background:var(--surface2);}
+.compact-track-row.playing{background:var(--purple-glow);}
+.compact-track-row.playing .track-title{color:var(--purple-bright);}
+.compact-like-btn:hover{background:var(--purple-glow);transform:scale(1.1);}
+
 /* ARTIST GRID (full view) */
 .artist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;padding:20px 24px;}
 .artist-card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 12px;border-radius:12px;background:var(--surface);cursor:pointer;transition:all 0.2s;text-align:center;border:1px solid transparent;}
@@ -495,6 +501,28 @@ body{
     <div class="scroll-pad"></div>
   </div>
 
+  <!-- ALBUM VIEW -->
+  <div class="view" id="view-album">
+    <div class="view-header">
+      <div class="view-cover" id="album-cover" style="background:linear-gradient(135deg,var(--surface3),var(--surface2))">
+        <svg viewBox="0 0 24 24" fill="var(--purple-bright)" style="width:60px;height:60px"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
+      </div>
+      <div class="view-info">
+        <div class="view-label">Album</div>
+        <div class="view-name" id="album-name">Album</div>
+        <div class="view-meta" id="album-meta">0 songs</div>
+      </div>
+    </div>
+    <div class="view-actions">
+      <button class="play-all-btn" onclick="playAlbum(currentAlbum, currentArtist)">▶ Play All</button>
+      <button class="shuffle-btn" onclick="shuffleAlbum(currentAlbum, currentArtist)">🔀 Shuffle</button>
+    </div>
+    <div class="section">
+      <div class="track-list" id="album-tracks"></div>
+    </div>
+    <div class="scroll-pad"></div>
+  </div>
+
   <!-- LIKED -->
   <div class="view" id="view-liked">
     <div class="view-header">
@@ -661,7 +689,7 @@ let liked=JSON.parse(localStorage.getItem('wb_liked')||'[]');
 let artistImages={};
 let queue=[],queueIndex=-1,shuffleMode=false,repeatMode=false;
 let isMuted=false,volumeLevel=0.8,currentTrackId=null,ctxTrackId=null;
-let currentPlaylistId=null,currentArtist=null,artistsDropdownOpen=false;
+let currentPlaylistId=null,currentArtist=null,currentAlbum=null,artistsDropdownOpen=false;
 let pendingArtistImageFor=null,pendingTrackArtFor=null;
 let toastTimer=null;
 const audio=new Audio();
@@ -876,7 +904,7 @@ function renderRandomAlbums(){
         <div class="section-title">Albums</div>
         <div class="album-shelf" style="display:flex;gap:16px;overflow-x:auto;padding:0 24px 16px;scrollbar-width:none;">
           ${randomAlbums.map(album => `
-            <div class="album-card" onclick="playAlbum('${esc(album.name)}', '${esc(album.artist)}')" style="cursor:pointer;min-width:140px;">
+            <div class="album-card" onclick="showAlbum('${esc(album.name)}', '${esc(album.artist)}')" style="cursor:pointer;min-width:140px;">
               <div class="album-cover" style="width:140px;height:140px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.3);margin-bottom:8px;">
                 ${album.artUrl 
                   ? `<img src="${album.artUrl}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentNode.innerHTML='💿';">`
@@ -914,6 +942,44 @@ function playAlbum(albumName, artistName) {
     queueIndex = 0;
     loadAndPlay(queue[0]);
     showToast(`🎵 Playing "${albumName}"`);
+  }
+}
+
+function showAlbum(albumName, artistName) {
+  currentAlbum = albumName;
+  currentArtist = artistName;
+  renderAlbumView(albumName, artistName);
+  setView('album');
+}
+
+function renderAlbumView(albumName, artistName) {
+  const albumTracks = tracks.filter(t => 
+    (t.album || 'Singles') === albumName && t.artist === artistName
+  );
+  
+  const nameEl = document.getElementById('album-name');
+  const metaEl = document.getElementById('album-meta');
+  const trackEl = document.getElementById('album-tracks');
+  
+  if (nameEl) nameEl.textContent = albumName;
+  if (metaEl) metaEl.textContent = `${albumTracks.length} song${albumTracks.length!==1?'s':''} · ${artistName}`;
+  if (trackEl) {
+    trackEl.innerHTML = albumTracks.map((t, i) => compactTrackRow(t, i + 1, albumTracks)).join('');
+    // Add hover styles for compact rows
+    trackEl.style.cssText += ' display:flex;flex-direction:column;gap:2px;';
+  }
+}
+
+function shuffleAlbum(albumName, artistName) {
+  const albumTracks = tracks.filter(t => 
+    (t.album || 'Singles') === albumName && t.artist === artistName
+  );
+  if (albumTracks.length > 0) {
+    shuffleMode = true;
+    queue = albumTracks;
+    queueIndex = Math.floor(Math.random() * albumTracks.length);
+    loadAndPlay(queue[queueIndex]);
+    showToast(`🔀 Shuffling "${albumName}"`);
   }
 }
 
@@ -1041,6 +1107,21 @@ function getArtists(){
 function trackArtHtml(track){
   if(track.artUrl)return `<img src="${esc(track.artUrl)}" onerror="this.style.display='none'">`;
   return '';
+}
+
+function compactTrackRow(track,num,context){
+  const isPlaying=currentTrackId===track.id;
+  const isLiked=liked.includes(track.id);
+  const ctxIds=JSON.stringify(context.map(t=>t.id)).replace(/"/g,'&quot;');
+  const dur=track.duration?fmt(track.duration):'—';
+  return `<div class="compact-track-row ${isPlaying?'playing':''}" onclick="playTrack('${track.id}',${ctxIds})" oncontextmenu="openCtx(event,'${track.id}')" style="display:grid;grid-template-columns:40px 1fr 80px 40px;align-items:center;gap:12px;padding:8px 10px;border-radius:6px;cursor:pointer;transition:all 0.15s;">
+    <div class="track-num" style="font-size:14px;color:var(--text-dim);text-align:center;font-variant-numeric:tabular-nums;">${isPlaying?'▶':num}</div>
+    <div class="track-title" style="font-size:14px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(track.title)}</div>
+    <div class="track-duration" style="font-size:13px;color:var(--text-dim);text-align:right;font-variant-numeric:tabular-nums;">${dur}</div>
+    <button class="compact-like-btn" onclick="event.stopPropagation();toggleLikeTrack('${track.id}')" style="background:none;border:none;color:${isLiked?'var(--purple-bright)':'var(--text-dim)'};cursor:pointer;font-size:16px;padding:4px;border-radius:50%;transition:all 0.15s;">
+      <svg viewBox="0 0 24 24" ${isLiked?'fill="currentColor"':'fill="none" stroke="currentColor" stroke-width="2"'} style="width:16px;height:16px"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    </button>
+  </div>`;
 }
 
 function trackRow(track,num,context){
@@ -1178,7 +1259,7 @@ function setView(id){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const nav=document.getElementById('nav-'+id);if(nav)nav.classList.add('active');
 }
-function showHome(){currentPlaylistId=null;currentArtist=null;setView('home');renderSidebar();}
+function showHome(){currentPlaylistId=null;currentArtist=null;currentAlbum=null;setView('home');renderSidebar();}
 function showSearchView(){setView('search');document.getElementById('nav-search').classList.add('active');}
 function showLiked(){setView('liked');renderLiked();}
 function showArtistsFull(){renderArtistGrid();setView('artists');}
