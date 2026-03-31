@@ -168,12 +168,20 @@ body{
 .section-title a{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;text-decoration:none;}
 .section-title a:hover{color:var(--purple-bright);}
 
+/* ALBUM SHELF */
+.album-shelf::-webkit-scrollbar{display:none;}
+.album-card{transition:transform 0.2s;}
+.album-card:hover{transform:translateY(-3px);}
+.album-cover{position:relative;}
+.album-cover img{transition:opacity 0.2s;}
+.album-cover:hover img{opacity:0.9;}
+
 /* ARTIST SHELF (homepage) */
 .artist-shelf{display:flex;gap:14px;overflow-x:auto;padding:0 24px 4px;scrollbar-width:none;}
 .artist-shelf::-webkit-scrollbar{display:none;}
 .artist-shelf-card{display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;min-width:100px;transition:transform 0.2s;}
 .artist-shelf-card:hover{transform:translateY(-3px);}
-.artist-shelf-avatar{width:88px;height:88px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,0.4);border:2px solid var(--border);flex-shrink:0;}
+.artist-shelf-avatar{width:88px;height:88px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,0.4);flex-shrink:0;}
 .artist-shelf-avatar img{width:100%;height:100%;object-fit:cover;}
 .artist-shelf-name{font-size:12px;font-weight:600;color:var(--text);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;}
 .artist-shelf-count{font-size:11px;color:var(--text-muted);}
@@ -263,6 +271,9 @@ body{
 .play-btn svg{width:18px;height:18px;}
 .play-btn:hover{transform:scale(1.08);}
 .play-btn:active{transform:scale(.96);}
+.play-btn.playing svg{display:none;}
+.play-btn.playing:hover svg{display:block;}
+.play-btn.playing:hover::after{content:'';position:absolute;width:18px;height:18px;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M6 19h4V5H6v14zm8-14v14h4V5h-4z'/%3E%3C/svg%3E");background-size:contain;background-repeat:no-repeat;background-position:center;}
 .progress-bar{display:flex;align-items:center;gap:8px;width:100%;}
 .time{font-size:11px;color:var(--text-dim);font-variant-numeric:tabular-nums;flex-shrink:0;}
 .progress-track{flex:1;height:4px;background:var(--surface3);border-radius:2px;cursor:pointer;position:relative;overflow:hidden;}
@@ -591,13 +602,6 @@ body{
     </div>
   </div>
  <div class="volume-controls">
-  <button class="vol-btn" onclick="toggleAudioSettings()" title="Audio Settings">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
-      <circle cx="12" cy="12" r="3"></circle>
-      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path>
-    </svg>
-  </button>
-
   <button class="vol-btn" onclick="toggleMute()">
     <svg viewBox="0 0 24 24" fill="currentColor" id="vol-icon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
   </button>
@@ -667,8 +671,14 @@ audio.addEventListener('timeupdate',()=>{
 });
 audio.addEventListener('loadedmetadata',()=>document.getElementById('time-total').textContent=fmt(audio.duration));
 audio.addEventListener('ended',()=>repeatMode==='one'?(audio.currentTime=0,audio.play()):nextTrack());
-audio.addEventListener('play',()=>{document.getElementById('play-icon').setAttribute('d','M6 19h4V5H6v14zm8-14v14h4V5h-4z');});
-audio.addEventListener('pause',()=>{document.getElementById('play-icon').setAttribute('d','M8 5v14l11-7z');});
+audio.addEventListener('play',()=>{
+  document.getElementById('play-btn').classList.add('playing');
+  document.getElementById('play-icon').setAttribute('d','M6 19h4V5H6v14zm8-14v14h4V5h-4z');
+});
+audio.addEventListener('pause',()=>{
+  document.getElementById('play-btn').classList.remove('playing');
+  document.getElementById('play-icon').setAttribute('d','M8 5v14l11-7z');
+});
 
 // LOGIN
 function showLoginScreen(){document.getElementById('login-screen').classList.add('show');}
@@ -822,7 +832,86 @@ function getInitials(name){
 }
 
 function renderHome(){
-  document.getElementById('all-tracks').innerHTML=tracks.map((t,i)=>trackRow(t,i+1,tracks)).join('');
+  // Show random 5 songs
+  const shuffledTracks = [...tracks].sort(() => 0.5 - Math.random());
+  const randomTracks = shuffledTracks.slice(0, 5);
+  document.getElementById('all-tracks').innerHTML=randomTracks.map((t,i)=>trackRow(t,i+1,randomTracks)).join('');
+  
+  // Render random albums section
+  renderRandomAlbums();
+}
+
+function renderRandomAlbums(){
+  // Get all unique albums
+  const albums = {};
+  tracks.forEach(t => {
+    const albumName = t.album || 'Singles';
+    if (!albums[albumName]) {
+      albums[albumName] = {
+        name: albumName,
+        artist: t.artist,
+        tracks: [],
+        artUrl: null
+      };
+    }
+    albums[albumName].tracks.push(t);
+    if (t.artUrl && !albums[albumName].artUrl) {
+      albums[albumName].artUrl = t.artUrl;
+    }
+  });
+  
+  // Get random 5 albums
+  const albumArray = Object.values(albums);
+  const shuffledAlbums = albumArray.sort(() => 0.5 - Math.random());
+  const randomAlbums = shuffledAlbums.slice(0, 5);
+  
+  // Create album section HTML
+  let albumSectionHTML = '';
+  if (randomAlbums.length > 0) {
+    albumSectionHTML = `
+      <div class="section">
+        <div class="section-title">Albums</div>
+        <div class="album-shelf" style="display:flex;gap:16px;overflow-x:auto;padding:0 24px 16px;scrollbar-width:none;">
+          ${randomAlbums.map(album => `
+            <div class="album-card" onclick="playAlbum('${esc(album.name)}', '${esc(album.artist)}')" style="cursor:pointer;min-width:140px;">
+              <div class="album-cover" style="width:140px;height:140px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.3);margin-bottom:8px;">
+                ${album.artUrl 
+                  ? `<img src="${album.artUrl}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentNode.innerHTML='💿';">`
+                  : '💿'
+                }
+              </div>
+              <div class="album-name" style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(album.name)}</div>
+              <div class="album-artist" style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(album.artist)}</div>
+              <div class="album-count" style="font-size:10px;color:var(--text-dim);">${album.tracks.length} tracks</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  // Insert album section after hero section
+  const heroSection = document.querySelector('.hero');
+  if (heroSection && albumSectionHTML) {
+    const existingAlbumSection = document.getElementById('random-albums-section');
+    if (existingAlbumSection) {
+      existingAlbumSection.outerHTML = albumSectionHTML;
+    } else {
+      heroSection.insertAdjacentHTML('afterend', `<div id="random-albums-section">${albumSectionHTML}</div>`);
+    }
+  }
+}
+
+function playAlbum(albumName, artistName) {
+  const albumTracks = tracks.filter(t => 
+    (t.album || 'Singles') === albumName && t.artist === artistName
+  );
+  if (albumTracks.length > 0) {
+    queue = albumTracks;
+    queueIndex = 0;
+    loadAndPlay(queue[0]);
+    showToast(`🎵 Playing "${albumName}"`);
+  }
 }
 
 function renderLiked(){
@@ -1281,29 +1370,12 @@ document.addEventListener('mouseup', () => {
 });
 
 /* --- AUDIO & THEME LOGIC --- */
-let audioCtx, source, bassFilter;
 
-function initAudioContext() {
-    if (audioCtx) return;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    source = audioCtx.createMediaElementSource(audio);
-    bassFilter = audioCtx.createBiquadFilter();
-    bassFilter.type = "lowshelf";
-    bassFilter.frequency.value = 200;
-    source.connect(bassFilter);
-    bassFilter.connect(audioCtx.destination);
-}
-
-function toggleAudioSettings() {
-    const boost = prompt("Enter Bass Boost level (0 to 15):", "0");
-    if (boost !== null) {
-        const val = parseFloat(boost);
-        if (isNaN(val)) return;
-        initAudioContext();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        bassFilter.gain.value = Math.min(15, Math.max(0, val));
-        showToast(`🔊 Bass Boost: +${bassFilter.gain.value}dB`);
-    }
+function setVolume(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    volumeLevel = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    audio.volume = volumeLevel;
+    document.getElementById('vol-fill').style.width = (volumeLevel * 100) + '%';
 }
 
 function toggleTheme() {
