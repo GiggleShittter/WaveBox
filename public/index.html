@@ -686,7 +686,28 @@ body{
   <div class="ctx-item" onclick="ctxLike()">Like</div>
   <div class="ctx-divider"></div>
   <div class="ctx-item" id="ctx-art" onclick="ctxUploadArt()" style="display:none">Set Track Art</div>
+  <div class="ctx-item" id="ctx-edit" onclick="ctxEditTrack()" style="display:none">✏️ Edit Track Info</div>
   <div class="ctx-item danger" id="ctx-delete" onclick="ctxDelete()" style="display:none">Delete Track</div>
+</div>
+
+<!-- EDIT TRACK MODAL -->
+<div class="modal-overlay" id="modal-edit-track">
+  <div class="modal">
+    <h3>Edit Track Info</h3>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
+      <label style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.8px;text-transform:uppercase">Title</label>
+      <input type="text" id="edit-title" placeholder="Track title...">
+      <label style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-top:6px">Artist</label>
+      <input type="text" id="edit-artist" placeholder="Artist name...">
+      <label style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-top:6px">Album</label>
+      <input type="text" id="edit-album" placeholder="Album name (e.g. Graduation)...">
+    </div>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:14px;line-height:1.5;">Use the same album name across tracks to group them together. Leave album blank for singles.</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-edit-track')">Cancel</button>
+      <button class="btn-create" id="edit-save-btn" onclick="saveTrackEdit()">Save</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -734,6 +755,7 @@ function attemptLogin(){
         document.getElementById('upload-btn').style.display='flex';
         document.getElementById('ctx-delete').style.display='flex';
         document.getElementById('ctx-art').style.display='flex';
+        document.getElementById('ctx-edit').style.display='flex';
         document.getElementById('artist-cover-upload').style.display='flex';
         document.getElementById('empty-sub').textContent='Drag & drop audio files or hit Upload to add music.';
         showToast('🔐 Admin mode enabled',5000);
@@ -1305,6 +1327,8 @@ function openCtx(e, id) {
   const artBtn = document.getElementById('ctx-art');
   if (delBtn) delBtn.style.display = isAdmin ? 'flex' : 'none';
   if (artBtn) artBtn.style.display = isAdmin ? 'flex' : 'none';
+  const editBtn = document.getElementById('ctx-edit');
+  if (editBtn) editBtn.style.display = isAdmin ? 'flex' : 'none';
 }
 
 document.addEventListener('click', () => {
@@ -1370,57 +1394,51 @@ function addToPlaylist(plId) {
   closeModal('modal-add-playlist');
 }
   
-  // --- CONTEXT MENU ACTIONS ---
-function ctxDelete() {
-    if (!isAdmin || !ctxTrackId) return;
-    const t = tracks.find(t => t.id === ctxTrackId);
-    if (!t) return;
-    
-    if (!confirm(`Delete "${t.title}" permanently?`)) return;
-
-    fetch(`/api/tracks/${encodeURIComponent(t.name)}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: adminPassword })
-    })
-    .then(r => r.json()).then(data => {
-        if (data.ok) {
-            if (currentTrackId === ctxTrackId) {
-                audio.pause();
-                currentTrackId = null;
-            }
-            liked = liked.filter(l => l !== ctxTrackId);
-            playlists.forEach(p => {
-                p.tracks = p.tracks.filter(tid => tid !== ctxTrackId);
-            });
-            localStorage.setItem('wb_liked', JSON.stringify(liked));
-            localStorage.setItem('wb_playlists', JSON.stringify(playlists));
-            showToast(`Deleted "${t.title}"`);
-            loadAll();
-        }
-    });
+// EDIT TRACK INFO
+function ctxEditTrack() {
+  if (!isAdmin || !ctxTrackId) return;
+  const t = tracks.find(t => t.id === ctxTrackId);
+  if (!t) return;
+  document.getElementById('edit-title').value = t.title || '';
+  document.getElementById('edit-artist').value = t.artist || '';
+  document.getElementById('edit-album').value = t.album || '';
+  document.getElementById('modal-edit-track').classList.add('open');
 }
 
-function ctxAddPlaylist() {
-    if (!playlists.length) { showToast('Create a playlist first'); return; }
-    document.getElementById('add-playlist-list').innerHTML = playlists.map(p => 
-        `<div class="ctx-item" onclick="addToPlaylist('${p.id}')" style="border-radius:8px">${esc(p.name)}</div>`
-    ).join('');
-    document.getElementById('modal-add-playlist').classList.add('open');
-}
-
-function addToPlaylist(plId) {
-    const pl = playlists.find(p => p.id === plId);
-    if (!pl || !ctxTrackId) return;
-    if (!pl.tracks.includes(ctxTrackId)) {
-        pl.tracks.push(ctxTrackId);
-        localStorage.setItem('wb_playlists', JSON.stringify(playlists));
-        renderAll();
-        showToast(`Added to "${pl.name}"`);
+function saveTrackEdit() {
+  if (!isAdmin || !ctxTrackId) return;
+  const t = tracks.find(t => t.id === ctxTrackId);
+  if (!t) return;
+  const title = document.getElementById('edit-title').value.trim();
+  const artist = document.getElementById('edit-artist').value.trim();
+  const album = document.getElementById('edit-album').value.trim();
+  if (!title) { showToast('Title cannot be empty'); return; }
+  const btn = document.getElementById('edit-save-btn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+  fetch(`/api/tracks/${encodeURIComponent(t.name)}/meta`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: adminPassword, title, artist, album })
+  }).then(r => r.json()).then(data => {
+    btn.textContent = 'Save'; btn.disabled = false;
+    if (data.ok) {
+      t.title = data.meta.title;
+      t.artist = data.meta.artist;
+      t.album = data.meta.album;
+      closeModal('modal-edit-track');
+      showToast('✓ Track info updated');
+      renderAll();
+      if (currentTrackId === t.id) {
+        document.getElementById('now-title').textContent = t.title;
+        document.getElementById('now-artist').textContent = t.artist;
+      }
     } else {
-        showToast('Already in this playlist');
+      showToast('Failed to save: ' + (data.error || 'unknown error'));
     }
-    closeModal('modal-add-playlist');
+  }).catch(() => {
+    btn.textContent = 'Save'; btn.disabled = false;
+    showToast('Save failed — check connection');
+  });
 }
 
 // TOAST (with optional duration)
@@ -1442,7 +1460,7 @@ const savedPw=sessionStorage.getItem('wb_admin');
 if(savedPw){
   fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:savedPw})})
     .then(r=>r.json()).then(data=>{
-      if(data.ok){isAdmin=true;adminPassword=savedPw;document.getElementById('admin-badge').style.display='inline';document.getElementById('upload-btn').style.display='flex';document.getElementById('artist-cover-upload').style.display='flex';setupDragDrop();}
+      if(data.ok){isAdmin=true;adminPassword=savedPw;document.getElementById('admin-badge').style.display='inline';document.getElementById('upload-btn').style.display='flex';document.getElementById('artist-cover-upload').style.display='flex';const ce=document.getElementById('ctx-edit');if(ce)ce.style.display='flex';setupDragDrop();}
       loadAll();
     }).catch(()=>loadAll());
 }else{
