@@ -451,6 +451,9 @@ body{
       <div class="upload-bar-track"><div class="upload-bar-fill" id="upload-bar"></div></div>
     </div>
 
+    <!-- RANDOM ALBUMS SECTION (permanent container) -->
+    <div id="random-albums-section" style="display:none"></div>
+
     <!-- ARTISTS SHELF -->
     <div id="artist-shelf-section" style="display:none">
       <div class="section" style="padding-bottom:0">
@@ -869,21 +872,13 @@ function getInitials(name){
 }
 
 function renderHome(){
-  // Show random 5 songs
-  const shuffledTracks = [...tracks].sort(() => 0.5 - Math.random());
-  const randomTracks = shuffledTracks.slice(0, 5);
-  document.getElementById('all-tracks').innerHTML=randomTracks.map((t,i)=>compactTrackRow(t,i+1,randomTracks)).join('');
-  
-  // Render random albums section
+  document.getElementById('all-tracks').innerHTML=tracks.map((t,i)=>compactTrackRow(t,i+1,tracks)).join('');
   renderRandomAlbums();
 }
 
 function refreshHomeContent() {
-  // Re-render albums and recent songs without affecting sidebar
   renderRandomAlbums();
-  const shuffledTracks = [...tracks].sort(() => 0.5 - Math.random());
-  const randomTracks = shuffledTracks.slice(0, 5);
-  document.getElementById('all-tracks').innerHTML=randomTracks.map((t,i)=>compactTrackRow(t,i+1,randomTracks)).join('');
+  document.getElementById('all-tracks').innerHTML=tracks.map((t,i)=>compactTrackRow(t,i+1,tracks)).join('');
   showToast('🔄 Content refreshed');
 }
 
@@ -940,14 +935,15 @@ function renderRandomAlbums(){
     `;
   }
   
-  // Insert album section after hero section
-  const heroSection = document.querySelector('.hero');
-  if (heroSection && albumSectionHTML) {
-    const existingAlbumSection = document.getElementById('random-albums-section');
-    if (existingAlbumSection) {
-      existingAlbumSection.outerHTML = albumSectionHTML;
+  // Use permanent container — never inject, just update innerHTML
+  const container = document.getElementById('random-albums-section');
+  if (container) {
+    if (albumSectionHTML) {
+      container.style.display = 'block';
+      container.innerHTML = albumSectionHTML;
     } else {
-      heroSection.insertAdjacentHTML('afterend', `<div id="random-albums-section">${albumSectionHTML}</div>`);
+      container.style.display = 'none';
+      container.innerHTML = '';
     }
   }
 }
