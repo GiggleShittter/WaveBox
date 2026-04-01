@@ -20,20 +20,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 150 * 1024 * 1024 } });
+// separate multer instances so field names don't clash
+const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 150 * 1024 * 1024 } });
+const imageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
-const authCheck = (req, res, next) => {
-  const pw = req.body.password || req.query.password;
-  if (pw !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
-  next();
-};
-
-// ── AUTH ──
-app.post('/api/auth', (req, res) => res.json({ ok: req.body.password === ADMIN_PASSWORD }));
-
-// ── HELPERS ──
-function getPublicUrl(path) {
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+function getPublicUrl(p) {
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(p);
   return data.publicUrl;
 }
 
@@ -48,6 +40,9 @@ function parseName(filename) {
   return { title, artist };
 }
 
+// ── AUTH ──
+app.post('/api/auth', (req, res) => res.json({ ok: req.body.password === ADMIN_PASSWORD }));
+
 // ── GET TRACKS ──
 app.get('/api/tracks/full', async (req, res) => {
   try {
@@ -58,17 +53,16 @@ app.get('/api/tracks/full', async (req, res) => {
     ]);
 
     const audioFiles = (tracksRes.data || []).filter(f => f.name && !f.name.startsWith('.'));
-    const metaFiles = new Set((metaRes.data || []).map(f => f.name));
-    const artFiles = new Set((artRes.data || []).map(f => f.name.replace(/\.[^/.]+$/, '')));
+    const metaMap = new Map((metaRes.data || []).map(f => [f.name, true]));
+    const artMap = new Map((artRes.data || []).map(f => [f.name.replace(/\.[^/.]+$/, ''), f.name]));
 
     const tracks = await Promise.all(audioFiles.map(async f => {
       const fallback = parseName(f.name);
       let title = fallback.title, artist = fallback.artist, album = '', duration = 0;
 
-      const metaKey = f.name + '.json';
-      if (metaFiles.has(metaKey)) {
+      if (metaMap.has(f.name + '.json')) {
         try {
-          const { data: mb } = await supabase.storage.from(BUCKET).download('meta/' + metaKey);
+          const { data: mb } = await supabase.storage.from(BUCKET).download('meta/' + f.name + '.json');
           const meta = JSON.parse(await mb.text());
           if (meta.title) title = meta.title;
           if (meta.artist) artist = meta.artist;
@@ -77,23 +71,13 @@ app.get('/api/tracks/full', async (req, res) => {
         } catch(e) {}
       }
 
-      // Check for track art
       const artKey = f.name.replace(/\.[^/.]+$/, '');
       let artUrl = null;
-      if (artFiles.has(artKey)) {
-        // find the actual file with extension
-        const artFile = (artRes.data || []).find(a => a.name.startsWith(artKey + '.'));
-        if (artFile) artUrl = getPublicUrl('track-art/' + artFile.name);
+      if (artMap.has(artKey)) {
+        artUrl = getPublicUrl('track-art/' + artMap.get(artKey));
       }
 
-      return {
-        id: f.id || f.name,
-        title, artist, album, duration,
-        name: f.name,
-        added: f.created_at,
-        streamUrl: getPublicUrl('tracks/' + f.name),
-        artUrl,
-      };
+      return { id: f.id || f.name, title, artist, album, duration, name: f.name, added: f.created_at, streamUrl: getPublicUrl('tracks/' + f.name), artUrl };
     }));
 
     res.json(tracks);
@@ -103,7 +87,6 @@ app.get('/api/tracks/full', async (req, res) => {
   }
 });
 
-// fallback
 app.get('/api/tracks', async (req, res) => {
   try {
     const { data } = await supabase.storage.from(BUCKET).list('tracks', { limit: 1000 });
@@ -115,8 +98,9 @@ app.get('/api/tracks', async (req, res) => {
   } catch(err) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// ── UPLOAD TRACKS ──
-app.post('/api/upload', upload.array('files'), authCheck, async (req, res) => {
+// ── UPLOAD TRACKS ── (password in form field, no authCheck middleware)
+app.post('/api/upload', audioUpload.array('files'), async (req, res) => {
+  if (req.body.password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   try {
     let uploaded = 0;
     for (const file of req.files) {
@@ -130,27 +114,27 @@ app.post('/api/upload', upload.array('files'), authCheck, async (req, res) => {
         if (tags.artist) artist = tags.artist;
         if (tags.album) album = tags.album;
         if (metadata.format.duration) duration = Math.round(metadata.format.duration);
-
-        // Extract embedded album art if present
         if (tags.picture && tags.picture.length > 0) {
           const pic = tags.picture[0];
           const artName = file.originalname.replace(/\.[^/.]+$/, '') + '.' + (pic.format.split('/')[1] || 'jpg');
           await supabase.storage.from(BUCKET).upload('track-art/' + artName, pic.data, { contentType: pic.format, upsert: true });
         }
       } catch(e) {}
-
       const { error } = await supabase.storage.from(BUCKET).upload('tracks/' + file.originalname, file.buffer, { contentType: file.mimetype, upsert: true });
       if (!error) {
         await supabase.storage.from(BUCKET).upload('meta/' + file.originalname + '.json', Buffer.from(JSON.stringify({ title, artist, album, duration })), { contentType: 'application/json', upsert: true });
         uploaded++;
+      } else {
+        console.error('Upload error:', error);
       }
     }
     res.json({ ok: true, uploaded });
-  } catch(err) { console.error(err); res.status(500).json({ error: 'Upload failed' }); }
+  } catch(err) { console.error(err); res.status(500).json({ error: 'Upload failed: ' + err.message }); }
 });
 
-// ── UPLOAD TRACK ART (manual override) ──
-app.post('/api/track-art', upload.single('image'), authCheck, async (req, res) => {
+// ── UPLOAD TRACK ART ──
+app.post('/api/track-art', imageUpload.single('image'), async (req, res) => {
+  if (req.body.password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   const trackName = req.body.trackName;
   if (!trackName || !req.file) return res.status(400).json({ error: 'Missing data' });
   const ext = req.file.originalname.split('.').pop();
@@ -161,7 +145,8 @@ app.post('/api/track-art', upload.single('image'), authCheck, async (req, res) =
 });
 
 // ── UPLOAD ARTIST IMAGE ──
-app.post('/api/artist-image', upload.single('image'), authCheck, async (req, res) => {
+app.post('/api/artist-image', imageUpload.single('image'), async (req, res) => {
+  if (req.body.password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   const artistName = req.body.artist;
   if (!artistName || !req.file) return res.status(400).json({ error: 'Missing data' });
   const ext = req.file.originalname.split('.').pop();
@@ -184,8 +169,43 @@ app.get('/api/artist-images', async (req, res) => {
   } catch(err) { res.json({}); }
 });
 
+// ── UPDATE TRACK METADATA ──
+app.patch('/api/tracks/:filename/meta', async (req, res) => {
+  if (req.body.password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const filename = decodeURIComponent(req.params.filename);
+    const { title, artist, album } = req.body;
+
+    // Read existing meta first to preserve duration
+    let existing = {};
+    try {
+      const { data: mb } = await supabase.storage.from(BUCKET).download('meta/' + filename + '.json');
+      existing = JSON.parse(await mb.text());
+    } catch(e) {}
+
+    const updated = {
+      ...existing,
+      title: title || existing.title || '',
+      artist: artist || existing.artist || 'Unknown Artist',
+      album: album !== undefined ? album : (existing.album || ''),
+    };
+
+    await supabase.storage.from(BUCKET).upload(
+      'meta/' + filename + '.json',
+      Buffer.from(JSON.stringify(updated)),
+      { contentType: 'application/json', upsert: true }
+    );
+
+    res.json({ ok: true, meta: updated });
+  } catch(err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update metadata' });
+  }
+});
+
 // ── DELETE TRACK ──
-app.delete('/api/tracks/:filename', authCheck, async (req, res) => {
+app.delete('/api/tracks/:filename', async (req, res) => {
+  if (req.body.password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   try {
     const filename = decodeURIComponent(req.params.filename);
     const artBase = filename.replace(/\.[^/.]+$/, '');
