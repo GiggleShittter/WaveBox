@@ -888,26 +888,30 @@ function refreshHomeContent() {
 }
 
 function renderRandomAlbums(){
-  // Get all unique albums
-  const albums = {};
+  // Get all unique albums using Map for proper grouping
+  const albumMap = new Map();
   tracks.forEach(t => {
     const albumName = t.album || 'Singles';
-    if (!albums[albumName]) {
-      albums[albumName] = {
+    const albumKey = `${albumName}|||${t.artist}`; // Composite key to avoid conflicts
+    
+    if (!albumMap.has(albumKey)) {
+      albumMap.set(albumKey, {
         name: albumName,
         artist: t.artist,
         tracks: [],
         artUrl: null
-      };
+      });
     }
-    albums[albumName].tracks.push(t);
-    if (t.artUrl && !albums[albumName].artUrl) {
-      albums[albumName].artUrl = t.artUrl;
+    
+    const album = albumMap.get(albumKey);
+    album.tracks.push(t);
+    if (t.artUrl && !album.artUrl) {
+      album.artUrl = t.artUrl;
     }
   });
   
   // Get random 5 albums
-  const albumArray = Object.values(albums);
+  const albumArray = Array.from(albumMap.values());
   const shuffledAlbums = albumArray.sort(() => 0.5 - Math.random());
   const randomAlbums = shuffledAlbums.slice(0, 5);
   
