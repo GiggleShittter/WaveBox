@@ -58,7 +58,7 @@ app.get('/api/tracks/full', async (req, res) => {
 
     const tracks = await Promise.all(audioFiles.map(async f => {
       const fallback = parseName(f.name);
-      let title = fallback.title, artist = fallback.artist, album = '', duration = 0;
+      let title = fallback.title, artist = fallback.artist, album = '', duration = 0, category = '', subcategory = '';
 
       if (metaMap.has(f.name + '.json')) {
         try {
@@ -68,6 +68,8 @@ app.get('/api/tracks/full', async (req, res) => {
           if (meta.artist) artist = meta.artist;
           if (meta.album) album = meta.album;
           if (meta.duration) duration = meta.duration;
+          if (meta.category) category = meta.category;
+          if (meta.subcategory) subcategory = meta.subcategory;
         } catch(e) {}
       }
 
@@ -77,7 +79,7 @@ app.get('/api/tracks/full', async (req, res) => {
         artUrl = getPublicUrl('track-art/' + artMap.get(artKey));
       }
 
-      return { id: f.id || f.name, title, artist, album, duration, name: f.name, added: f.created_at, streamUrl: getPublicUrl('tracks/' + f.name), artUrl };
+      return { id: f.id || f.name, title, artist, album, duration, category, subcategory, name: f.name, added: f.created_at, streamUrl: getPublicUrl('tracks/' + f.name), artUrl };
     }));
 
     res.json(tracks);
@@ -92,7 +94,7 @@ app.get('/api/tracks', async (req, res) => {
     const { data } = await supabase.storage.from(BUCKET).list('tracks', { limit: 1000 });
     const tracks = (data || []).filter(f => f.name && !f.name.startsWith('.')).map(f => {
       const { title, artist } = parseName(f.name);
-      return { id: f.id || f.name, title, artist, album: '', duration: 0, name: f.name, added: f.created_at, streamUrl: getPublicUrl('tracks/' + f.name), artUrl: null };
+      return { id: f.id || f.name, title, artist, album: '', duration: 0, category: '', subcategory: '', name: f.name, added: f.created_at, streamUrl: getPublicUrl('tracks/' + f.name), artUrl: null };
     });
     res.json(tracks);
   } catch(err) { res.status(500).json({ error: 'Failed' }); }
@@ -103,6 +105,8 @@ app.post('/api/upload', audioUpload.array('files'), async (req, res) => {
   if (req.body.password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   try {
     let uploaded = 0;
+    const category = req.body.category || '';
+    const subcategory = req.body.subcategory || '';
     for (const file of req.files) {
       if (!file.mimetype.startsWith('audio/')) continue;
       let { title, artist } = parseName(file.originalname);
@@ -122,7 +126,7 @@ app.post('/api/upload', audioUpload.array('files'), async (req, res) => {
       } catch(e) {}
       const { error } = await supabase.storage.from(BUCKET).upload('tracks/' + file.originalname, file.buffer, { contentType: file.mimetype, upsert: true });
       if (!error) {
-        await supabase.storage.from(BUCKET).upload('meta/' + file.originalname + '.json', Buffer.from(JSON.stringify({ title, artist, album, duration })), { contentType: 'application/json', upsert: true });
+        await supabase.storage.from(BUCKET).upload('meta/' + file.originalname + '.json', Buffer.from(JSON.stringify({ title, artist, album, duration, category, subcategory })), { contentType: 'application/json', upsert: true });
         uploaded++;
       } else {
         console.error('Upload error:', error);
